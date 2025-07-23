@@ -29,33 +29,69 @@ namespace EOTReminder.ViewModels
         public ObservableCollection<TimeSlot> BottomSlots { get; } = new ObservableCollection<TimeSlot>();
 
         private bool _isAlertActive;
-        private DateTime _lastExcelReloadDate = DateTime.MinValue;
-        private bool _hasReloadedForCurrentSunriseCycle = false;
-        // Stores the sunrise time for which data is currently loaded
-        private DateTime _currentSunriseForReloadCheck = DateTime.MinValue;
-
-        public bool IsAlertActive // Controls visibility of normal 2x2 grid vs. alert layout
-        {
-            get => _isAlertActive;
-            set { _isAlertActive = value; OnPropertyChanged(); }
-        }
-
         private bool _isAlertNotActive;
-        public bool IsAlertNotActive // Controls visibility of normal 2x2 grid vs. alert layout
-        {
-            get => _isAlertNotActive;
-            set { _isAlertNotActive = value; OnPropertyChanged(); }
-        }
-
-        public string TodayDate => DateTime.Now.ToString("dd/MM/yyyy");
-        public string CurrentTime => DateTime.Now.ToString("HH:mm:ss");
-
+        private bool _hasReloadedForCurrentSunriseCycle;
+        private Timer _timer;
         // Private DateTime fields to hold the actual time values for calculations
         private DateTime _internalSunriseTime;
         private DateTime _internalMiddayTime;
         private DateTime _internalSunsetTime;
+        private DateTime _reloadTriggerTime;
+        
+        private string _todaysDate;
         private string _hebrewDateString; // Private field for Hebrew date string
+        private string _currentLang = "he"; // Default to Hebrew as per original code
+        private readonly Dictionary<string, Dictionary<string, string>> _translations =
+            new Dictionary<string, Dictionary<string, string>>()
+            {
 
+                ["en"] = new Dictionary<string, string>()
+                {
+                    ["a2EOS1"] = "End of Shema 1", // Original 4-slot description
+                    ["a1EOS2"] = "End of Shema 2",
+                    ["b2EOT1"] = "End of Prayer 1", // Original 4-slot description
+                    ["b1EOT2"] = "End of Prayer 2",
+                    ["EOS1_Single"] = "End of Shema", // NEW: Single slot description for EOS
+                    ["EOT1_Single"] = "End of Prayer", // NEW: Single slot description for EOT
+                    ["Passed"] = "Passed"
+                },
+                ["he"] = new Dictionary<string, string>()
+                {
+                    ["a2EOS1"] = "סו\"ז קר\"ש מג\"א", // Original 4-slot description
+                    ["a1EOS2"] = "סו\"ז קר\"ש תניא גר\"א",
+                    ["b2EOT1"] = "סו\"ז תפילה מג\"א", // Original 4-slot description
+                    ["b1EOT2"] = "סו\"ז תפילה תניא גר\"א",
+                    ["EOS1_Single"] = "סו\"ז קריאת שמע", // NEW: Single slot description for EOS
+                    ["EOT1_Single"] = "סו\"ז תפילה", // NEW: Single slot description for EOT
+                    ["Passed"] = "עבר זמנו", // Corrected key to "Passed"
+                }
+            };
+        private int _normalGridRows = 2;
+        private int _normalGridColumns = 2;
+        private int _bottomGridColumns = 3;
+        private int _normalGridPaddings = 2;
+        private int _topGridPaddings = 5;
+        private int _bottomGridPaddings = 3;
+
+
+        // Controls visibility of normal 2x2 grid vs. alert layout
+        public bool IsAlertActive
+        {
+            get => _isAlertActive;
+            set { _isAlertActive = value; OnPropertyChanged(); }
+        }
+        // Controls visibility of normal 2x2 grid vs. alert layout
+        public bool IsAlertNotActive
+        {
+            get => _isAlertNotActive;
+            set { _isAlertNotActive = value; OnPropertyChanged(); }
+        }
+        public string TodayDate
+        {
+            get { return _todaysDate; } 
+            set { _todaysDate = value; OnPropertyChanged(); }
+        } 
+        public string CurrentTime => DateTime.Now.ToString("HH:mm:ss");
         // Public string properties for UI binding
         public string HebrewDate
         {
@@ -77,44 +113,60 @@ namespace EOTReminder.ViewModels
             get => _internalSunsetTime == DateTime.MinValue ? "N/A" : _internalSunsetTime.ToString("HH:mm:ss");
             private set { /* Setter is not used as _internalSunsetTime is set directly */ }
         }
-
+        public int NormalGridPaddings
+        {
+            get => _normalGridPaddings;
+            set { _normalGridPaddings = value; OnPropertyChanged(); }
+        }
+        public int TopGridPaddings
+        {
+            get => _topGridPaddings;
+            set { _topGridPaddings = value; OnPropertyChanged(); }
+        }
+        public int BottomGridPaddings
+        {
+            get => _bottomGridPaddings;
+            set { _bottomGridPaddings = value; OnPropertyChanged(); }
+        }
+        public int NormalGridRows
+        {
+            get => _normalGridRows;
+            set { _normalGridRows = value; OnPropertyChanged(); }
+        }
+        public int NormalGridColumns
+        {
+            get => _normalGridColumns;
+            set { _normalGridColumns = value; OnPropertyChanged(); }
+        }
+        public int BottomGridColumns
+        {
+            get => _bottomGridColumns;
+            set { _bottomGridColumns = value; OnPropertyChanged(); }
+        }
+        
+        
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private Timer _timer;
-        private string _currentLang = "he"; // Default to Hebrew as per original code
-
-        private readonly Dictionary<string, Dictionary<string, string>> _translations =
-            new Dictionary<string, Dictionary<string, string>>()
-            {
-                ["en"] = new Dictionary<string, string>()
-                {
-                    ["a2EOS1"] = "End of Shema 1", // Added numbers for clarity
-                    ["a1EOS2"] = "End of Shema 2",
-                    ["b2EOT1"] = "End of Prayer 1",
-                    ["b1EOT2"] = "End of Prayer 2",
-                    ["Passed"] = "Passed"
-                },
-                ["he"] = new Dictionary<string, string>()
-                {
-                    ["a2EOS1"] = "סו\"ז קר\"ש מג\"א",
-                    ["a1EOS2"] = "סו\"ז קר\"ש תניא גר\"א",
-                    ["b2EOT1"] = "סו\"ז תפילה מג\"א",
-                    ["b1EOT2"] = "סו\"ז תפילה תניא גר\"א",
-                    ["Passed"] = "עבר זמנו", // Corrected key to "Passed"
-                }
-            };
-        
         public MainViewModel()
         {
+            
             // Required for ExcelDataReader to handle older Excel formats
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
             LoadFromExcel();
             InitTimer();
+
+            _reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
         }
 
         public void InitializeData()
         {
-            
+            IsAlertActive = false;
+            IsAlertNotActive = true;
+            _hasReloadedForCurrentSunriseCycle = false;
+
+            // Call this initially and whenever UseTwoTimeSlots changes
+            UpdateGridDimensions();
+
         }
 
         private void InitTimer()
@@ -192,40 +244,39 @@ namespace EOTReminder.ViewModels
                                 !slot.AlertFlags["3"])
                             {
                                 if (DateTime.Today.DayOfWeek != DayOfWeek.Saturday || Properties.Settings.Default.AlertOnShabbos)
-                                   PlayAlert(slot.Id, "3"); // Still pass "3" to choose the WAV file
-                                
+                                    PlayAlert(slot.Id, "3"); // Still pass "3" to choose the WAV file
+
                                 slot.AlertFlags["3"] = true;
                             }
-
-                            // Step 1: Ensure _internalSunriseTime is always updated for the current Gregorian day.
-                            // This is crucial if the application runs continuously past midnight,
-                            // as _internalSunriseTime would otherwise remain from the previous day.
-                            if (_internalSunriseTime.Date != DateTime.Today)
-                            {
-                                // It's a new Gregorian day, or _internalSunriseTime hasn't been updated for today yet.
-                                // Reload Excel data to get the correct sunrise time for today.
-                                _hasReloadedForCurrentSunriseCycle = false; // Reset the flag for the new day's cycle
-                                _currentSunriseForReloadCheck = _internalSunriseTime; // Store this sunrise time as the basis for the current cycle
-                                Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
-                            }
-
-                            // Now, _internalSunriseTime is guaranteed to be for DateTime.Today.
-                            // Step 2: Calculate the specific reload trigger time for today's sunrise.
-                            DateTime reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
-
-                            // Step 3: Check if it's time to perform the scheduled daily reload (72 minutes before sunrise).
-                            // This condition ensures:
-                            // 1. The current time is past the calculated trigger time.
-                            // 2. We haven't already reloaded for *this specific sunrise cycle*.
-                            //    (We use _hasReloadedForCurrentSunriseCycle to prevent multiple reloads within the same cycle).
-                            if (DateTime.Now >= reloadTriggerTime && !_hasReloadedForCurrentSunriseCycle)
-                            {
-                                Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {reloadTriggerTime:HH:mm:ss}");
-                                LoadFromExcel(); // Perform the actual scheduled reload
-                                _hasReloadedForCurrentSunriseCycle = true; // Mark that reload has happened for this cycle
-                                _currentSunriseForReloadCheck = _internalSunriseTime; // Update the marker to the new sunrise time after reload
-                            }
                         }
+                    }
+
+                    // Step 1: Ensure _internalSunriseTime is always updated for the current Gregorian day.
+                    // This is crucial if the application runs continuously past midnight,
+                    // as _internalSunriseTime would otherwise remain from the previous day.
+                    if (_internalSunriseTime.Date != DateTime.Today && _hasReloadedForCurrentSunriseCycle)
+                    {
+                        // It's a new Gregorian day, or _internalSunriseTime hasn't been updated for today yet.
+                        // Reload Excel data to get the correct sunrise time for today.
+                        _hasReloadedForCurrentSunriseCycle = false; // Reset the flag for the new day's cycle
+
+                        // Now, _internalSunriseTime is guaranteed to be for DateTime.Today.
+                        // Step 2: Calculate the specific reload trigger time for today's sunrise.
+                        _reloadTriggerTime = _internalSunriseTime.Subtract(TimeSpan.FromMinutes(72));
+
+                        Logger.LogInfo($"New Gregorian day detected. Excel data reloaded to update current day's times. Sunrise: {_internalSunriseTime:HH:mm:ss}");
+                    }
+
+                    // Step 3: Check if it's time to perform the scheduled daily reload (72 minutes before sunrise).
+                    // This condition ensures:
+                    // 1. The current time is past the calculated trigger time.
+                    // 2. We haven't already reloaded for *this specific sunrise cycle*.
+                    //    (We use _hasReloadedForCurrentSunriseCycle to prevent multiple reloads within the same cycle).
+                    if (DateTime.Now.TimeOfDay >= _reloadTriggerTime.TimeOfDay && !_hasReloadedForCurrentSunriseCycle)
+                    {
+                        Logger.LogInfo($"Triggering scheduled daily Excel reload. Current Time: {DateTime.Now:HH:mm:ss}, Reload Trigger Time: {_reloadTriggerTime:HH:mm:ss}");
+                        LoadFromExcel(); // Perform the actual scheduled reload
+                        _hasReloadedForCurrentSunriseCycle = true; // Mark that reload has happened for this cycle
                     }
 
                     IsAlertNotActive = !IsAlertActive;
@@ -240,13 +291,26 @@ namespace EOTReminder.ViewModels
 
         private void LoadFromExcel()
         {
+            TimeSlots.Clear(); // Clear existing slots before Loading
+
+            var today = DateTime.Today;
+            DataRow todayRow = null;
+
+            TodayDate = DateTime.Now.ToString("dd/MM/yyyy");
+
+            HebrewDate = GetHebrewJewishDateString(today, false); // Calculate if not in Excel
+
             string path = Properties.Settings.Default.ExcelFilePath;
-          
+
             if (!File.Exists(path))
             {
-                Logger.LogWarning($"Excel file '{path}' not found. Loading mock data.");
-                LoadMock();
-                return;
+                path = @"C:\DailyTimes.xlsx";
+                if (!File.Exists(path))
+                {
+                    Logger.LogWarning($"Excel file '{path}' not found. Loading mock data.");
+                    LoadMock();
+                    return;
+                }
             }
 
             try
@@ -273,9 +337,6 @@ namespace EOTReminder.ViewModels
                             LoadMock();
                             return;
                         }
-
-                        var today = DateTime.Today;
-                        DataRow todayRow = null;
 
                         // Find the "Date" column index dynamically
                         int dateColumnIndex = -1;
@@ -353,10 +414,18 @@ namespace EOTReminder.ViewModels
                         TimeSlots.Clear();
 
                         // Add EOS/EOT slots
-                        AddSlot("a1EOS2", ParseTimeFromCell(todayRow, "EOS2"));
-                        AddSlot("a2EOS1", ParseTimeFromCell(todayRow, "EOS1"));
-                        AddSlot("b1EOT2", ParseTimeFromCell(todayRow, "EOT2"));
-                        AddSlot("b2EOT1", ParseTimeFromCell(todayRow, "EOT1"));
+                        if (Properties.Settings.Default.UseTwoTimeSlots) // Only add if not using two slots
+                        {
+                            AddSlot("a2EOS1", ParseTimeFromCell(todayRow, "EOS1"));
+                            AddSlot("b2EOT1", ParseTimeFromCell(todayRow, "EOT1"));
+                        }
+                        else
+                        {
+                            AddSlot("a1EOS2", ParseTimeFromCell(todayRow, "EOS2"));
+                            AddSlot("a2EOS1", ParseTimeFromCell(todayRow, "EOS1"));
+                            AddSlot("b1EOT2", ParseTimeFromCell(todayRow, "EOT2"));
+                            AddSlot("b2EOT1", ParseTimeFromCell(todayRow, "EOT1"));
+                        }
 
                         TimeSlots.OrderBy(s => s.Id);
                         //TimeSlots = TimeSlots.Reverse();
@@ -370,19 +439,6 @@ namespace EOTReminder.ViewModels
                         OnPropertyChanged(nameof(Sunrise));
                         OnPropertyChanged(nameof(Midday));
                         OnPropertyChanged(nameof(Sunset));
-
-                        // Set Hebrew Date (can be read from Excel or calculated)
-                        // Example if HebrewDate column exists:
-                        // int hebrewDateColIndex = GetColumnIndex("HebrewDate");
-                        // if (hebrewDateColIndex != -1 && todayRow[hebrewDateColIndex] != DBNull.Value)
-                        // {
-                        //     HebrewDate = todayRow[hebrewDateColIndex].ToString();
-                        // }
-                        // else
-                        // {
-                        HebrewDate = GetHebrewJewishDateString(today, false); // Calculate if not in Excel
-                        // }
-                        OnPropertyChanged(nameof(HebrewDate));
 
                         // Check for any parsing errors using the internal DateTime fields
                         if (TimeSlots.Any(s => s.Time == DateTime.MinValue) ||
@@ -399,26 +455,36 @@ namespace EOTReminder.ViewModels
                 Logger.LogWarning($"An error occurred while reading the Excel file: {ex.Message}\nLoading mock data instead.");
                 LoadMock();
             }
-
+            UpdateGridDimensions();
             // Initialize alert triggers after data is set (either from Excel or mock)
             foreach (var slot in TimeSlots)
             {
                 slot.AlertFlags = new Dictionary<string, bool>() { ["30"] = false, ["10"] = false, ["3"] = false };
             }
+            OnPropertyChanged(nameof(TimeSlots)); // Ensure UI updates
         }
 
         private void LoadMock()
         {
             TimeSlots.Clear(); // Clear existing slots before adding mock data
             var now = DateTime.Now;
-            AddSlot("a2EOS1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
-            AddSlot("a1EOS2", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
-            AddSlot("b2EOT1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
-            AddSlot("b1EOT2", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
-
+            
+            // Add EOS/EOT slots
+            if (Properties.Settings.Default.UseTwoTimeSlots) // Only add if not using two slots
+            {
+                AddSlot("a2EOS1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+                AddSlot("b2EOT1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                AddSlot("a2EOS1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+                AddSlot("a1EOS2", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+                AddSlot("b2EOT1", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+                AddSlot("b1EOT2", DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture));
+            }
             // Set internal DateTime fields for mock data
             _internalSunriseTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
-            _internalMiddayTime =  DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
+            _internalMiddayTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
             _internalSunsetTime = DateTime.ParseExact("00:00", "HH:mm", CultureInfo.InvariantCulture);
 
             HebrewDate = GetHebrewJewishDateString(now, false);
@@ -428,14 +494,31 @@ namespace EOTReminder.ViewModels
             OnPropertyChanged(nameof(Midday));
             OnPropertyChanged(nameof(Sunset));
             OnPropertyChanged(nameof(HebrewDate));
+
+            UpdateGridDimensions();
+            OnPropertyChanged(nameof(TimeSlots)); // Ensure UI updates
         }
 
         private void AddSlot(string id, DateTime time)
         {
+            string descriptionKey = id;
+            // NEW: Determine the correct translation key based on UseTwoTimeSlots
+            if (Properties.Settings.Default.UseTwoTimeSlots)
+            {
+                if (id == "a2EOS1")
+                {
+                    descriptionKey = "EOS1_Single";
+                }
+                else if (id == "b2EOT1")
+                {
+                    descriptionKey = "EOT1_Single";
+                }
+            }
+
             TimeSlots.Add(new TimeSlot
             {
                 Id = id,
-                Description = _translations[_currentLang][id],
+                Description = _translations[_currentLang][descriptionKey],
                 PassedText = _translations[_currentLang]["Passed"],
                 Time = time,
                 IsPassed = false,
@@ -550,6 +633,22 @@ namespace EOTReminder.ViewModels
             }
         }
 
+        private void UpdateGridDimensions()
+        {
+            if (Properties.Settings.Default.UseTwoTimeSlots)
+            {
+                NormalGridColumns = 1; // 1 column for EOS1, 1 for EOT1
+                NormalGridRows = 2;
+                BottomGridColumns = 1;
+            }
+            else
+            {
+                NormalGridColumns = 2;
+                NormalGridRows = 2;
+                BottomGridColumns = 3;
+            }
+        }
+
         private string GetHebrewJewishDateString(DateTime anyDate, bool addDayOfWeek)
         {
             StringBuilder stringBuilder = new StringBuilder();
@@ -569,7 +668,20 @@ namespace EOTReminder.ViewModels
             _currentLang = lang;
             foreach (var slot in TimeSlots)
             {
-                if (_translations[lang].TryGetValue(slot.Id, out var trans))
+                string descriptionKey = slot.Id;
+                // NEW: Determine the correct translation key based on UseTwoTimeSlots
+                if (Properties.Settings.Default.UseTwoTimeSlots)
+                {
+                    if (slot.Id == "a2EOS1")
+                    {
+                        descriptionKey = "EOS1_Single";
+                    }
+                    else if (slot.Id == "b2EOT1")
+                    {
+                        descriptionKey = "EOT1_Single";
+                    }
+                }
+                if (_translations[lang].TryGetValue(descriptionKey, out var trans))
                     slot.Description = trans;
             }
             // Update the "Passed" text for already passed items

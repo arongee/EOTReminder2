@@ -11,14 +11,19 @@ namespace EOTReminder.Views
 {
     public partial class MainWindow : Window
     {
-        private MainViewModel _viewModel => DataContext as MainViewModel;
+        private MainViewModel _viewModel = null;
 
         public MainWindow()
         {
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
-           // _viewModel.InitializeData();
+
+            _viewModel = new MainViewModel();   
+            this.DataContext = _viewModel;
+            
+            _viewModel.InitializeData();
             InitializeComponent();
+            UpdateGridDimensions();
         }
         
         // Optional: Language switcher handler if you add ComboBox in XAML later
@@ -59,12 +64,30 @@ namespace EOTReminder.Views
             // This ensures the Excel path from settings is available.
            
         }
+        
         private void OpenOptionsPage()
         {
             OptionsWindow optionsWindow = new OptionsWindow();
             optionsWindow.Owner = this; // Set the main window as the owner
             optionsWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             optionsWindow.ShowDialog(); // Show as dialog to block main window until closed
+        }
+
+        private void UpdateGridDimensions()
+        {
+            if (Properties.Settings.Default.UseTwoTimeSlots)
+            {
+                //margin values correspond to left, top, right, and bottom, respectively.
+                NormalItemControl.Margin    =  new Thickness(320, 0, 320, 0);
+                TopItemControl.Margin       =  new Thickness(0, 0, 0, 0);
+                BottomItemControl.Margin    =  new Thickness(350, 0, 350, 0);
+            }
+            else
+            {
+                NormalItemControl.Margin = new Thickness(0, 0, 0, 0);
+                TopItemControl.Margin = new Thickness(0, 0, 0, 0);
+                BottomItemControl.Margin = new Thickness(0, 0, 0, 0);
+            }
         }
     }
 }

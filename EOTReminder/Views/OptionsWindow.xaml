@@ -70,6 +70,8 @@
                 <!-- Spacer -->
                 <RowDefinition Height="Auto"/>
                 <!-- Alert on Shabbos -->
+                <RowDefinition Height="Auto"/>
+                <!-- Use Two Time Slots -->
                 <RowDefinition Height="*"/>
                 <!-- Spacer -->
                 <RowDefinition Height="Auto"/>
@@ -137,8 +139,10 @@
             <TextBlock Grid.Row="27" Grid.Column="0" Text="Alert on Shabbos:" Margin="5" VerticalAlignment="Center"/>
             <CheckBox Grid.Row="27" Grid.Column="1" IsChecked="{Binding AlertOnShabbos}" Margin="5" VerticalAlignment="Center" HorizontalAlignment="Left"/>
 
+            <TextBlock Grid.Row="28" Grid.Column="0" Text="Use only EOS1 and EOT1:" Margin="5" VerticalAlignment="Center"/>
+            <CheckBox Grid.Row="28" Grid.Column="1" IsChecked="{Binding UseTwoTimeSlots}" Margin="5" VerticalAlignment="Center" HorizontalAlignment="Left"/>
             <!-- Buttons -->
-            <Grid Grid.Row="29" Grid.ColumnSpan="3">
+            <Grid Grid.Row="30" Grid.ColumnSpan="3">
                 <!-- Use a Grid for button alignment -->
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

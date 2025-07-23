@@ -106,6 +106,14 @@ namespace EOTReminder.ViewModels
             set { _alertOnShabbos = value; OnPropertyChanged(); }
         }
 
+        private bool _useTwoTimeSlots;
+        public bool UseTwoTimeSlots
+        {
+            get => _useTwoTimeSlots;
+            set { _useTwoTimeSlots = value; OnPropertyChanged(); }
+        }
+
+
         // Commands
         public ICommand SaveSettingsCommand { get; }
         public ICommand CloseApplicationCommand { get; }
@@ -145,6 +153,7 @@ namespace EOTReminder.ViewModels
             FirstAlertMinutes = Properties.Settings.Default.FirstAlertMinutes;
             SecondAlertMinutes = Properties.Settings.Default.SecondAlertMinutes;
             ExcelFilePath = Properties.Settings.Default.ExcelFilePath;
+            UseTwoTimeSlots = Properties.Settings.Default.UseTwoTimeSlots;
 
             // NEW: Load new settings
             EOS1FirstAlertPath = Properties.Settings.Default.EOS1FirstAlertPath;
@@ -174,6 +183,7 @@ namespace EOTReminder.ViewModels
             // Properties.Settings.Default.EOT2SecondAlertPath = EOT2SecondAlertPath;
             Properties.Settings.Default.VisualAlertMinutes = VisualAlertMinutes;
             Properties.Settings.Default.AlertOnShabbos = AlertOnShabbos;
+            Properties.Settings.Default.UseTwoTimeSlots = UseTwoTimeSlots;
 
             Properties.Settings.Default.Save();
             Logger.LogInfo("Application settings saved successfully.");

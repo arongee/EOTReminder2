@@ -205,10 +205,12 @@
             <!-- Normal 2x2 grid - visible only if no alert -->
             <ItemsControl
                 ItemsSource="{Binding TimeSlots}"
-                Visibility="{Binding IsAlertNotActive, Converter={StaticResource BoolToVisibility}, ConverterParameter=False}">
+                Visibility="{Binding IsAlertNotActive, Converter={StaticResource BoolToVisibility}, ConverterParameter=False}"
+                Padding="2"
+                Name="NormalItemControl">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <UniformGrid Columns="2" Rows="2"/>
+                        <UniformGrid Columns="{Binding NormalGridColumns}" Rows="{Binding NormalGridRows}"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
@@ -254,7 +256,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- Top big EO - binds to TopSlots (which will contain one item) -->
-                <ItemsControl ItemsSource="{Binding TopSlots}" Grid.Row="0" Padding="5">
+                <ItemsControl ItemsSource="{Binding TopSlots}" Grid.Row="0" Padding="5" x:Name="TopItemControl">
                     <!-- Line 217: Changed Margin to Padding -->
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -310,11 +312,11 @@
                 </ItemsControl>
 
                 <!-- Bottom smaller EOs - binds to BottomSlots (which will contain three items) -->
-                <ItemsControl ItemsSource="{Binding BottomSlots}" Grid.Row="1" Padding="2">
+                <ItemsControl ItemsSource="{Binding BottomSlots}" Grid.Row="1" Padding="2" x:Name="BottomItemControl">
                     <!-- Line 239: Changed Margin to Padding -->
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <UniformGrid Columns="3" Rows="1"/>
+                            <UniformGrid Columns="{Binding BottomGridColumns}" Rows="1"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -355,7 +357,9 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+            
             </Grid>
+       
         </Grid>
 
         <!-- Footer -->
